@@ -154,9 +154,10 @@ Vision API enabled.
 # Build
 docker build -t flexbone-ocr .
 
-# Run, mounting your gcloud credentials for local Vision access
+# Run, mounting your gcloud credentials for local Vision access.
+# The container runs as the non-root user "appuser", so mount into its home.
 docker run -p 8080:8080 \
-  -v "$HOME/.config/gcloud:/root/.config/gcloud:ro" \
+  -v "$HOME/.config/gcloud:/home/appuser/.config/gcloud:ro" \
   -e GOOGLE_CLOUD_PROJECT=<your-project-id> \
   flexbone-ocr
 ```

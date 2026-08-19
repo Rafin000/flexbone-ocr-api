@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY config.py wsgi.py ./
 COPY app ./app
 
+# Run as a non-root user (security best practice / defense in depth).
+RUN useradd --create-home --uid 1000 appuser
+USER appuser
+
 # Cloud Run injects PORT (defaults to 8080). Gunicorn binds to it.
 ENV PORT=8080
 EXPOSE 8080
