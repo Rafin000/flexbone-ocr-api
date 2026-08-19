@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.log
+.DS_Store
+# Never commit service-account keys
+*.json
+!sample_images/*.json
+key*.json
+service-account*.json

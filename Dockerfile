@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code.
+COPY config.py wsgi.py ./
+COPY app ./app
+
+# Cloud Run injects PORT (defaults to 8080). Gunicorn binds to it.
+ENV PORT=8080
+EXPOSE 8080
+
+# Production WSGI server. One worker with a few threads suits Cloud Run's
+# per-container concurrency; the work is I/O-bound (calling the Vision API).
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --timeout 120 wsgi:app"]

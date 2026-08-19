@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.git
+.gitignore
+.DS_Store
+*.log
+README.md
+sample_images/
+key*.json
+service-account*.json
