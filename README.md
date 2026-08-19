@@ -32,9 +32,9 @@ Extract text from an uploaded JPG image.
 |---|---|
 | **Method** | `POST` |
 | **Content-Type** | `multipart/form-data` |
-| **Form field** | `image` (the JPG file) |
+| **Form field** | `image` (the image file) |
 | **Max size** | 10 MB |
-| **Formats** | JPG / JPEG |
+| **Formats** | JPG / JPEG / PNG / GIF |
 
 **Request (curl):**
 ```bash
