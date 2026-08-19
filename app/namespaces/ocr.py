@@ -32,7 +32,8 @@ single_parser.add_argument(
 batch_parser = ocr_ns.parser()
 batch_parser.add_argument(
     BATCH_FIELD, location="files", type=FileStorage, required=True,
-    action="append", help="One or more image files",
+    help="Image file. Send the 'images' field multiple times for a batch "
+         "(e.g. curl -F images=@a.jpg -F images=@b.jpg).",
 )
 
 
