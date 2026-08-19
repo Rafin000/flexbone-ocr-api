@@ -17,6 +17,9 @@ class Config(object):
     ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif"}
     ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif"}
 
+    # --- OCR provider: "vision" (default) or "tesseract" ---
+    OCR_PROVIDER = os.getenv("OCR_PROVIDER", "vision")
+
     # --- Optional API-key auth (public by default; the challenge uses plain curl) ---
     API_KEY = os.getenv("API_KEY", "")
 

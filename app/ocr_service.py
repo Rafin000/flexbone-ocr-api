@@ -1,69 +1,13 @@
-"""OCR integration with Google Cloud Vision.
+"""OCR entry point.
 
-Isolated from the web layer so the routes stay thin and the OCR provider can
-be swapped (e.g. to Tesseract) without touching the views.
+Exposes a single `ocr_service` instance built by the provider factory from
+config (OCR_PROVIDER). The rest of the app imports from here and stays
+unaware of which OCR engine is in use.
 """
-from dataclasses import dataclass
+from app.providers.base import OcrError, OcrResult  # re-exported for callers
+from app.providers.factory import OcrProviderFactory
 
-from google.cloud import vision
+# Provider chosen at startup from config (vision | tesseract).
+ocr_service = OcrProviderFactory.create()
 
-
-@dataclass
-class OcrResult:
-    text: str
-    confidence: float
-
-
-class OcrError(Exception):
-    """Raised when the OCR provider returns an error."""
-
-
-class VisionOcrService:
-    """Thin wrapper around the Cloud Vision client.
-
-    The client is created lazily and reused across requests (it holds a
-    connection pool and is safe to share).
-    """
-
-    def __init__(self) -> None:
-        self._client = None
-
-    @property
-    def client(self) -> vision.ImageAnnotatorClient:
-        if self._client is None:
-            self._client = vision.ImageAnnotatorClient()
-        return self._client
-
-    def extract_text(self, image_bytes: bytes) -> OcrResult:
-        image = vision.Image(content=image_bytes)
-        # document_text_detection exposes per-block confidence (unlike the
-        # simpler text_detection), so we can report a real confidence score.
-        response = self.client.document_text_detection(image=image)
-
-        if response.error.message:
-            raise OcrError(response.error.message)
-
-        annotation = response.full_text_annotation
-        text = (annotation.text or "").strip()
-
-        if not text:
-            # "No text found" is a valid, successful outcome — not an error.
-            return OcrResult(text="", confidence=0.0)
-
-        return OcrResult(text=text, confidence=self._average_confidence(annotation))
-
-    @staticmethod
-    def _average_confidence(annotation) -> float:
-        """Vision reports confidence per block; average them into one number."""
-        confidences = [
-            block.confidence
-            for page in annotation.pages
-            for block in page.blocks
-        ]
-        if not confidences:
-            return 0.0
-        return round(sum(confidences) / len(confidences), 4)
-
-
-# Single shared instance, imported by the views.
-ocr_service = VisionOcrService()
+__all__ = ["ocr_service", "OcrError", "OcrResult"]

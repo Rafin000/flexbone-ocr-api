@@ -95,12 +95,15 @@ The OpenAPI spec is at `/swagger.json`.
 
 ## Implementation explanation
 
-**OCR service — Google Cloud Vision.**
-I used Cloud Vision's `document_text_detection`, which returns the full text
-plus **per-block confidence**, so the API can report a real confidence score
-(averaged across text blocks) rather than a hard-coded value. Vision was chosen
-over Tesseract because it integrates natively with GCP, gives higher accuracy on
-varied image quality, and needs no OCR engine bundled into the container.
+**OCR service — a swappable provider abstraction.**
+The OCR engine sits behind an `OcrProvider` interface with two implementations —
+**Google Cloud Vision** and **Tesseract** — chosen at startup by a factory from
+the `OCR_PROVIDER` config (`vision` | `tesseract`). The rest of the app depends
+on the interface, not the engine, so swapping providers is a config change, not
+a code change. The default is **Vision** (`document_text_detection`), which
+returns the full text plus **per-block confidence**, so the API reports a real
+confidence score rather than a hard-coded value; Tesseract is the open-source,
+no-external-API fallback.
 
 **File upload handling & validation.**
 Uploads come in as `multipart/form-data` on the `image` field. Validation is
@@ -124,7 +127,12 @@ config.py                  # Config class — all settings, env-driven
 wsgi.py                    # gunicorn / local entry point (app = create_app())
 app/
   __init__.py              # create_app() factory: app, logging, limiter, Api, namespaces
-  ocr_service.py           # Cloud Vision wrapper (swappable)
+  ocr_service.py           # exposes the factory-built OCR provider instance
+  providers/               # OCR provider abstraction (interface + factory)
+    base.py                # OcrProvider interface + OcrResult
+    vision_provider.py     # Google Cloud Vision implementation
+    tesseract_provider.py  # Tesseract implementation
+    factory.py             # picks the provider from OCR_PROVIDER config
   decorators.py            # @handle_errors, @require_api_key
   responses.py             # consistent JSON envelopes
   extensions.py            # shared Flask-Limiter instance
@@ -205,6 +213,7 @@ All via environment variables (see `config.py`):
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8080` | Port to bind (Cloud Run sets this) |
+| `OCR_PROVIDER` | `vision` | OCR engine: `vision` or `tesseract` |
 | `MAX_FILE_SIZE_MB` | `10` | Upload size limit |
 | `API_KEY` | _(empty)_ | If set, requires this key in the `Authorization` header |
 | `RATE_LIMIT` | `60 per minute` | Per-IP rate limit |

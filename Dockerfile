@@ -3,7 +3,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching.
+# System dependency for the Tesseract OCR provider (used when OCR_PROVIDER=tesseract).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first for better layer caching.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
