@@ -4,6 +4,7 @@ A serverless API on **Google Cloud Run** that accepts a JPG image, extracts its
 text with **Google Cloud Vision** OCR, and returns the result as JSON.
 
 **Live API:** `https://flexbone-ocr-1035620221514.us-central1.run.app`
+**Interactive docs (Swagger UI):** open the base URL in a browser — the root serves live, testable API documentation.
 
 ```bash
 curl -X POST -F "image=@sample_images/sample_text.jpg" \
@@ -73,7 +74,8 @@ When the image contains no text, the call still succeeds with `text: ""`,
 Health/liveness check → `{ "status": "alive" }`.
 
 ### `GET /`
-Landing page with usage info.
+Interactive **Swagger UI** — browse and try the API in the browser.
+The OpenAPI spec is at `/swagger.json`.
 
 ---
 
@@ -102,21 +104,26 @@ idle. On Cloud Run the app authenticates to the Vision API through the service
 account automatically (no keys in the image). The container binds to the
 `$PORT` Cloud Run injects.
 
-**Code structure.**
+**Code structure — app factory + Flask-RESTX namespaces.**
 ```
-config.py            # Config class — all settings, env-driven
-wsgi.py              # gunicorn / local entry point
+config.py                  # Config class — all settings, env-driven
+wsgi.py                    # gunicorn / local entry point (app = create_app())
 app/
-  __init__.py        # Flask app + config loading
-  views.py           # routes: /, /alive, /extract-text  (thin)
-  ocr_service.py     # Cloud Vision wrapper (swappable)
-  decorators.py      # @handle_errors, @require_api_key
-  responses.py       # consistent JSON envelope
-sample_images/       # test images (text, receipt, blank)
+  __init__.py              # create_app() factory: builds app, Api, namespaces
+  ocr_service.py           # Cloud Vision wrapper (swappable)
+  decorators.py            # @handle_errors, @require_api_key
+  responses.py             # consistent JSON envelope
+  namespaces/
+    health.py              # health_ns  -> /alive
+    ocr.py                 # ocr_ns     -> /extract-text
+sample_images/             # test images (text, receipt, blank)
 Dockerfile
 ```
-Concerns are separated so the routes stay thin, cross-cutting logic lives in
-decorators, and the OCR provider could be swapped without touching the web layer.
+The app is built with an **application factory** (`create_app()`) and routes are
+grouped into **Flask-RESTX namespaces** (Resource classes), which also generate
+the interactive Swagger UI at the root URL. Concerns are separated so the routes
+stay thin, cross-cutting logic lives in decorators, and the OCR provider could be
+swapped without touching the web layer.
 
 ---
 

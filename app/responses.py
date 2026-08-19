@@ -1,27 +1,21 @@
-"""Helpers for building consistent JSON responses.
+"""Consistent JSON response builders.
 
-The success payload for /extract-text follows the exact shape required by the
-challenge: { success, text, confidence, processing_time_ms }.
-Errors use a matching { success: false, error } envelope.
+Flask-RESTX serializes a returned ``(dict, status_code)`` tuple to JSON, so
+these helpers just shape the payload. The /extract-text success body follows
+the exact format required by the challenge.
 """
-from flask import jsonify
 
 
 def ocr_response(text: str, confidence: float, processing_time_ms: int):
     message = "Text extracted successfully." if text else "No text found in image."
-    return (
-        jsonify(
-            {
-                "success": True,
-                "text": text,
-                "confidence": confidence,
-                "processing_time_ms": processing_time_ms,
-                "message": message,
-            }
-        ),
-        200,
-    )
+    return {
+        "success": True,
+        "text": text,
+        "confidence": confidence,
+        "processing_time_ms": processing_time_ms,
+        "message": message,
+    }, 200
 
 
 def error_response(status_code: int, message: str):
-    return jsonify({"success": False, "error": message}), status_code
+    return {"success": False, "error": message}, status_code
