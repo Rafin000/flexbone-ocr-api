@@ -1,8 +1,7 @@
 """Central configuration.
 
-Follows the microservice convention of a single `config.py` exposing a
-`Config` class, with every value overridable from the environment so nothing
-is hard-coded across the app.
+A single `config.py` exposing a `Config` class, every value overridable from
+the environment so nothing is hard-coded across the app.
 """
 import os
 
@@ -10,25 +9,29 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
-    # --- Upload limits (challenge spec: JPG only, max 10 MB) ---
+    # --- Upload limits ---
     MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
     MAX_CONTENT_LENGTH = MAX_FILE_SIZE_MB * 1024 * 1024
 
-    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg"}
-    ALLOWED_EXTENSIONS = {"jpg", "jpeg"}
+    # Core spec requires JPG; PNG and GIF are supported too (bonus: multi-format).
+    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif"}
+    ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif"}
 
-    # Bonus: accept PNG too when explicitly enabled (off by default per spec).
-    if os.getenv("ALLOW_PNG", "false").lower() == "true":
-        ALLOWED_CONTENT_TYPES.add("image/png")
-        ALLOWED_EXTENSIONS.add("png")
-
-    # --- Optional API-key auth ---
-    # The endpoint is public by default (the challenge is tested with a plain
-    # curl). If API_KEY is set, the @require_api_key decorator enforces it —
-    # the same header-token pattern used across our other microservices.
+    # --- Optional API-key auth (public by default; the challenge uses plain curl) ---
     API_KEY = os.getenv("API_KEY", "")
 
+    # --- Rate limiting (bonus) — per client IP ---
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    RATE_LIMIT = os.getenv("RATE_LIMIT", "60 per minute")
+
+    # --- In-memory cache for identical images (bonus) ---
+    CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+    CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "128"))
+
+    # --- Batch endpoint (bonus) ---
+    MAX_BATCH_FILES = int(os.getenv("MAX_BATCH_FILES", "10"))
+
     # --- Server ---
-    # Cloud Run injects PORT; default to 8080 for local runs.
     PORT = int(os.getenv("PORT", "8080"))
     GCP_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

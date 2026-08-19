@@ -48,11 +48,25 @@ curl -X POST -F "image=@test_image.jpg" <base-url>/extract-text
   "text": "extracted text content here",
   "confidence": 0.95,
   "processing_time_ms": 1234,
-  "message": "Text extracted successfully."
+  "message": "Text extracted successfully.",
+  "cached": false,
+  "metadata": { "width": 900, "height": 300, "format": "JPEG", "mode": "L", "size_kb": 19.44 }
 }
 ```
 When the image contains no text, the call still succeeds with `text: ""`,
 `confidence: 0.0`, and `message: "No text found in image."`.
+
+### `POST /extract-text/batch`
+Batch OCR (bonus) — extract text from **multiple** images in one request.
+Upload several files under the `images` field:
+```bash
+curl -X POST \
+  -F "images=@a.jpg" -F "images=@b.jpg" \
+  <base-url>/extract-text/batch
+```
+Returns `{ success, count, processing_time_ms, results: [...] }`, where each
+result carries its `filename` and either the extracted text or a per-file error
+(max 10 files per batch).
 
 **Error response — `4xx / 5xx`:**
 ```json
@@ -109,14 +123,17 @@ account automatically (no keys in the image). The container binds to the
 config.py                  # Config class — all settings, env-driven
 wsgi.py                    # gunicorn / local entry point (app = create_app())
 app/
-  __init__.py              # create_app() factory: builds app, Api, namespaces
+  __init__.py              # create_app() factory: app, logging, limiter, Api, namespaces
   ocr_service.py           # Cloud Vision wrapper (swappable)
   decorators.py            # @handle_errors, @require_api_key
-  responses.py             # consistent JSON envelope
+  responses.py             # consistent JSON envelopes
+  extensions.py            # shared Flask-Limiter instance
+  cache.py                 # thread-safe LRU cache for identical images
+  utils.py                 # text cleanup, image metadata, hashing
   namespaces/
     health.py              # health_ns  -> /alive
-    ocr.py                 # ocr_ns     -> /extract-text
-sample_images/             # test images (text, receipt, blank)
+    ocr.py                 # ocr_ns     -> /extract-text, /extract-text/batch
+sample_images/             # test images (text, receipt, blank, png)
 Dockerfile
 ```
 The app is built with an **application factory** (`create_app()`) and routes are
@@ -164,6 +181,22 @@ curl http://localhost:8080/alive
 
 ---
 
+## Bonus features implemented
+
+| Feature | How |
+|---|---|
+| **Confidence scores** | Averaged from Cloud Vision's per-block confidence |
+| **Multiple formats (PNG, GIF)** | JPG + PNG + GIF accepted (still rejects everything else) |
+| **Text preprocessing** | Trailing whitespace trimmed, blank-line runs collapsed |
+| **Image metadata extraction** | Width, height, format, mode, size (via Pillow) |
+| **Caching for identical images** | SHA-256 of the bytes keys an in-memory LRU cache; repeats return `cached: true` instantly |
+| **Rate limiting** | Per-client-IP limit (default 60/min) via Flask-Limiter → `429` when exceeded |
+| **Batch processing** | `POST /extract-text/batch` handles many images per call |
+
+> The cache and rate-limiter are in-memory (per instance) — perfect for this
+> service; a shared store (e.g. Redis) would be the next step for multi-instance
+> consistency.
+
 ## Configuration
 
 All via environment variables (see `config.py`):
@@ -172,8 +205,12 @@ All via environment variables (see `config.py`):
 |---|---|---|
 | `PORT` | `8080` | Port to bind (Cloud Run sets this) |
 | `MAX_FILE_SIZE_MB` | `10` | Upload size limit |
-| `ALLOW_PNG` | `false` | Also accept PNG (bonus) |
 | `API_KEY` | _(empty)_ | If set, requires this key in the `Authorization` header |
+| `RATE_LIMIT` | `60 per minute` | Per-IP rate limit |
+| `RATE_LIMIT_ENABLED` | `true` | Toggle rate limiting |
+| `CACHE_ENABLED` | `true` | Toggle identical-image caching |
+| `CACHE_MAX_ENTRIES` | `128` | LRU cache size |
+| `MAX_BATCH_FILES` | `10` | Max images per batch request |
 | `GOOGLE_CLOUD_PROJECT` | _(env)_ | GCP project id |
 
 ---
@@ -188,4 +225,5 @@ gcloud run deploy flexbone-ocr \
 ```
 
 ## Tech stack
-Python · Flask · gunicorn · Google Cloud Vision · Docker · Google Cloud Run
+Python · Flask · Flask-RESTX (Swagger) · Flask-Limiter · Pillow · gunicorn ·
+Google Cloud Vision · Docker · Google Cloud Run
