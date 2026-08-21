@@ -7,6 +7,7 @@ import logging
 from functools import wraps
 
 from flask import current_app, request
+from werkzeug.exceptions import HTTPException
 
 from app.responses import error_response
 
@@ -38,12 +39,18 @@ def require_api_key(view):
 
 def handle_errors(view):
     """Catch any unhandled exception and return a consistent error envelope,
-    so a failure never leaks a stack trace to the client."""
+    so a failure never leaks a stack trace to the client.
+
+    Deliberate HTTP errors (e.g. RequestEntityTooLarge from MAX_CONTENT_LENGTH)
+    are re-raised so Flask's own error handlers set the right status code —
+    swallowing them here would turn a clean 413 into a misleading 500."""
 
     @wraps(view)
     def wrapper(*args, **kwargs):
         try:
             return view(*args, **kwargs)
+        except HTTPException:
+            raise
         except Exception as exc:  # noqa: BLE001 - deliberately broad at the edge
             logger.exception("Unhandled error in %s", view.__name__)
             return error_response(500, f"Internal server error: {exc}")

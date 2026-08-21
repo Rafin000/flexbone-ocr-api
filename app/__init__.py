@@ -17,6 +17,9 @@ def create_app(config_class: type = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
     app.config["MAX_CONTENT_LENGTH"] = config_class.MAX_CONTENT_LENGTH
+    # Keep error bodies to our own envelope — without this Flask-RESTX appends
+    # its raw "message" (e.g. the werkzeug 413 text) alongside our "error".
+    app.config["ERROR_INCLUDE_MESSAGE"] = False
 
     _configure_logging(config_class)
     _configure_cache(config_class)
@@ -45,7 +48,10 @@ def create_app(config_class: type = Config) -> Flask:
     api.add_namespace(health_ns)
     api.add_namespace(ocr_ns)
 
-    @app.errorhandler(RequestEntityTooLarge)
+    # Registered on the Api (not the app): Flask-RESTX routes errors raised inside
+    # a Resource through its own handler, so an app-level handler would be bypassed
+    # and the client would get RESTX's {"message": ...} instead of our envelope.
+    @api.errorhandler(RequestEntityTooLarge)
     def handle_too_large(_err):
         limit = config_class.MAX_FILE_SIZE_MB
         return {"success": False, "error": f"File exceeds the {limit} MB size limit."}, 413
