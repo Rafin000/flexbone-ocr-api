@@ -8,7 +8,7 @@ import logging
 
 from flask import Flask
 from flask_restx import Api
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from config import Config
 
@@ -55,6 +55,12 @@ def create_app(config_class: type = Config) -> Flask:
     def handle_too_large(_err):
         limit = config_class.MAX_FILE_SIZE_MB
         return {"success": False, "error": f"File exceeds the {limit} MB size limit."}, 413
+
+    @api.errorhandler(HTTPException)
+    def handle_http_exception(err):
+        # Catch-all so framework-raised errors (429 from the rate limiter, 405,
+        # ...) still answer with the same {success, error} envelope as the routes.
+        return {"success": False, "error": err.description}, err.code or 500
 
     return app
 

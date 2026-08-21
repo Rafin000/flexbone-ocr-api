@@ -70,7 +70,7 @@ result carries its `filename` and either the extracted text or a per-file error
 
 **Error response — `4xx / 5xx`:**
 ```json
-{ "success": false, "error": "Unsupported file type 'text/plain'. Allowed: image/jpeg, image/jpg." }
+{ "success": false, "error": "Unsupported file type 'text/plain'. Allowed: image/gif, image/jpeg, image/jpg, image/png." }
 ```
 
 **Status codes:**
@@ -107,8 +107,9 @@ no-external-API fallback.
 
 **File upload handling & validation.**
 Uploads come in as `multipart/form-data` on the `image` field. Validation is
-layered: the content type must be `image/jpeg`, the extension must be `.jpg`/`.jpeg`
-(defence in depth against a spoofed content type), the file must be non-empty,
+layered: the content type must be one of the allowed image types, the extension
+must match (`.jpg`/`.jpeg`/`.png`/`.gif`) as defence in depth against a spoofed
+content type, the file must be non-empty,
 and the 10 MB cap is enforced both explicitly and at the framework level
 (`MAX_CONTENT_LENGTH`, which makes Flask reject oversized bodies with `413`).
 
