@@ -23,6 +23,82 @@ curl -X POST -F "image=@sample_images/sample_text.jpg" \
 
 ---
 
+## Testing the live API
+
+Everything below is copy-paste ready against the deployed service. Clone the
+repo first so the sample images are available:
+
+```bash
+git clone https://github.com/Rafin000/flexbone-ocr-api.git
+cd flexbone-ocr-api
+API=https://flexbone-ocr-1035620221514.us-central1.run.app
+```
+
+**1 — Service is up**
+```bash
+curl $API/alive
+# {"status": "alive"}
+```
+> The service scales to zero, so the very first request after an idle period
+> may take a few seconds to cold start. Subsequent calls are fast.
+
+**2 — Extract text from a JPG** (the core requirement)
+```bash
+curl -X POST -F "image=@sample_images/sample_text.jpg" $API/extract-text
+# text: "Flexbone OCR Challenge\nHello World 2026", confidence: 0.9884
+```
+
+**3 — A real document**
+```bash
+curl -X POST -F "image=@sample_images/receipt.jpg" $API/extract-text
+# text: "INVOICE #A-1042\nConsulting\n500.00\n..."  ("cached": false)
+```
+
+**4 — Caching**: send the same image again and it returns from cache
+```bash
+curl -X POST -F "image=@sample_images/receipt.jpg" $API/extract-text
+# identical text, "cached": true, processing_time_ms drops to ~1
+```
+
+**5 — PNG** (bonus: multi-format)
+```bash
+curl -X POST -F "image=@sample_images/sample_png.png" $API/extract-text
+```
+
+**6 — An image with no text** — succeeds with an empty result rather than erroring
+```bash
+curl -X POST -F "image=@sample_images/blank.jpg" $API/extract-text
+# {"success": true, "text": "", "confidence": 0.0, "message": "No text found in image."}
+```
+
+**7 — Batch** (bonus)
+```bash
+curl -X POST \
+  -F "images=@sample_images/sample_text.jpg" \
+  -F "images=@sample_images/receipt.jpg" \
+  $API/extract-text/batch
+```
+
+**8 — Error handling.** Add `-w '\n%{http_code}\n'` to any command to see the
+status code.
+```bash
+echo "not an image" > /tmp/notes.txt
+curl -X POST -F "image=@/tmp/notes.txt" $API/extract-text        # 415, unsupported type
+curl -X POST $API/extract-text                                    # 400, no file provided
+curl -X GET  $API/extract-text                                    # 405, wrong method
+
+dd if=/dev/urandom of=/tmp/big.jpg bs=1m count=12 2>/dev/null
+curl -X POST -F "image=@/tmp/big.jpg" $API/extract-text           # 413, over the 10 MB limit
+```
+Every error returns the same shape: `{"success": false, "error": "..."}`.
+
+**9 — In the browser**: open the base URL for Swagger UI and run any endpoint
+interactively, including file upload.
+
+> **Rate limit:** 60 requests per minute per IP. A scripted loop past that
+> returns `429` with `{"success": false, "error": "60 per 1 minute"}` — expected,
+> not a failure. It resets after a minute.
+
 ## API documentation
 
 ### `POST /extract-text`
@@ -38,7 +114,8 @@ Extract text from an uploaded JPG image.
 
 **Request (curl):**
 ```bash
-curl -X POST -F "image=@test_image.jpg" <base-url>/extract-text
+curl -X POST -F "image=@test_image.jpg" \
+  https://flexbone-ocr-1035620221514.us-central1.run.app/extract-text
 ```
 
 **Success response — `200 OK`:**
@@ -62,7 +139,7 @@ Upload several files under the `images` field:
 ```bash
 curl -X POST \
   -F "images=@a.jpg" -F "images=@b.jpg" \
-  <base-url>/extract-text/batch
+  https://flexbone-ocr-1035620221514.us-central1.run.app/extract-text/batch
 ```
 Returns `{ success, count, processing_time_ms, results: [...] }`, where each
 result carries its `filename` and either the extracted text or a per-file error
